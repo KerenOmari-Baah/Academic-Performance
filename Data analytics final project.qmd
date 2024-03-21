@@ -1,0 +1,330 @@
+---
+title: "Analyzing the Determinants of Academic Performance:An Analysis Of the Factors that Influence Sucess in Portuguese "
+author: "Keren Omari-Baah"
+date: 2024-01-28
+format: html
+editor: visual
+code-fold: true
+standalone: true
+embed-resources: true
+toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      message = FALSE,
+                      warnings = FALSE)
+library(tidyverse)
+library(MASS)
+library(nnet)
+library(MuMIn)
+library(ggplot2)
+```
+
+```{r}
+#| label: data
+exam_data <- read_csv("exam_data.csv") 
+```
+
+# Introduction
+
+Education a plays an important role in the social development and growth of individuals, which influences their future opportunities and life trajectories. In recent years, the educational sector has undergone significant transformation and understanding what determines academic success has therefore become necessary for educators, policymakers, and researchers. This report delves into an in-depth analysis of student achievement in secondary education within two Portuguese schools, with the aim of identifying various demographic, social, and school-related factors that have impact on academic performance in Mathematics and Portuguese language studies.
+
+The dataset in this study consists of variables, ranging from student grades to their socio-economic backgrounds, collected through school reports and questionnaires. We will deal with two specific tasks in our analysis. The first task involves constructing a predictive model for the initial period grade in Portuguese (G1.Port) without any other grade features. However, we will include variables such as `freetime`, `schoolsup`, paid.Math, and `Dalc`, `sex`, `age`, `famsize`, `Medu`, `Fedu`, travel time, `studytime`, `Pstatus`, absences, activities and exclude reasons for school choice. The second task requires the transformation of the G1.Port grade into a categorical variable divided into three bins, each containing approximately equal numbers of cases. This newly categorized variable will serve as the response variable in a classification model with the same variable inclusion and exclusion criteria as the first task.
+
+Our goal is to gain insights to what influences academic sucess by examining a wide range of factors, from familial to personal habits in these two subjects. Moreover, it seeks to contribute to the broader discourse on education by identifying key factors that can be addressed to enhance student achievement.
+
+The methodology section that follows will detail the data pre processing steps, including the handling of missing values, exclusion of some variables, and the rationale behind the chosen techniques. This will set the foundation for the subsequent analysis and discussion of the results, which will help us understanding of the predictors of academic success in these two Portugual secondary schools.
+
+# Background of Data
+
+The dataset offers view of student life and their achievement in two Portuguese schools: Gabriel Pereira (GP) and Mousinho da Silveira (MS) which was carefully compiled through a combination of school reports and student questionnaires. The dataset is not only about academic performance but also provides a look into the socio-economic and personal features of the students’ lives. It encompasses a wide range of variables, grouped into several categories:
+
+-   The demographic information of the students which include the basic student data such as school (GP or MS), sex, age, and their home address.
+-   The students' family background with variables like family size, parents’ cohabitation status, education levels of parents, and parents’ occupations fall under this category.
+-   Personal and social factors that are related to each student. This category covers information such as the student’s travel time to school, weekly study time, participation in extracurricular activities, romantic relationships, health and lifestyle choices including alcohol consumption.
+-   Apart from grades in Portuguese (like G1.Port) and Mathematics, the dataset also includes academic deatail such information on past class failures, school absences, and whether the student received any extra educational support.
+-   School-related features like reasons for choosing the particular school, the student’s guardian, failed classes and whether the student had access to resources like internet at home or had attended nursery school.
+
+The two unique aspects of this dataset is that it focuses on academic perspective and a comprehensive range of non-academic variables. First, it provides grades for two the subjects, Mathematics and Portuguese, with a suffix indicating the subject (e.g., `G1.Math`, `G1.Port`). This is significant because it allows us to analyze the different academic disciplines. Secondly, the wide spread socio-economic, familial, and personal factors allows us to properly view the students’ educational environment and its impact on their academic achievements. This is important because we can use this data to build predictive models that can identify students at risk of underperforming.
+
+The observational unit in our dataset is the individual student. The dataset has `r nrow(exam_data)` stings and `r nrow(exam_data)` variables in total. In this analysis, we will use G1 .Port as our response variable. This is a list of all the explanatory variables in our dataset:
+
+1.  `School` indicates the student's school, either Gabriel Pereira (GP) or Mousinho da Silveira (MS).
+2.  `Sex` states the student's gender, either female (F) or male (M).
+3.  `Age` represents the student's age, which ranges from 15 to 22 years.
+4.  \`Address\` categorizes the student's home address as urban (U) or rural (R).
+5.  `Famsize` refers to the family size, classified as less or equal to 3 (LE3) or greater than 3 (GT3).
+6.  `Pstatus` describes the parents' cohabitation status, either living together (T) or apart (A).
+7.  `Medu` secifies the mother's education level, with options ranging from 0 (none) to 4 (higher education).
+8.  `Fedu` specifies the father's education level, also ranging from 0 (none) to 4 (higher education).
+9.  `Mjob` specifies the mother's job, with categories like teacher, health care related, services, at_home, or other.
+10. `Fjob` specifies the father's job, with similar categories as \`Mjob\`.
+11. `Guardian` specifies who the student's guardian is, options being mother, father, or other.
+12. `Traveltime` measures the time taken for the student to travel from home to school, ranging from less than 15 minutes to over an hour.
+13. `Studytime` is the student's weekly study time, from less than 2 hours to more than 10 hours.
+14. `Failures` counts the number of past class failures, with a special category for 3 or more failures.
+15. `Schoolsup` indicates whether the student receives extra educational support, with options yes or no.
+16. `Famsup` tell us if there is family educational support available to the student, again with yes or no options.
+17. `Paid` shows if the student takes extra paid classes within the course subject, answerable with yes or no.
+18. `Activities` shows whether the student participates in extra-curricular activities, with possible responses being yes or no.
+19. `Nursery` indicates whether the student attended nursery school, with a simple yes or no answer.
+20. `Higher` reflects the student's aspiration for higher education, answerable as yes or no.
+21. `nternet` tell us if the student has internet access at home, with options yes or no.
+22. `Romantic` discloses if the student is in a romantic relationship, answerable as yes or no.
+23. `Famrel` rates the quality of family relationships on a scale from 1 (very bad) to 5 (excellent).
+24. `Freetime` assesses the amount of free time the student has after school, on a scale from 1 (very low) to 5 (very high).
+25. `Goout` measures the frequency of how many tmes a student goes out with friends, rated from 1 (very low) to 5 (very high).
+26. `Dalc` measures workday alcohol consumption on a scale from 1 (very low) to 5 (very high).
+27. `Walc` measures weekend alcohol consumption, also on a scale from 1 to 5.
+28. `Health` evaluates the student's current health status, on a scale from 1 (very bad) to 5 (very good).
+29. `Absences` counts the number of school absences, ranging from 0 to 93.
+30. `G1.Port` represents the student's first period grade in Portuguese. The numeric scale ranges from 0 to 20, where 0 is the lowest and 20 is the highest possible score.
+31. `G2.Port` represents the student's second period grade in Portuguese, also on a scale from 0 to 20. It reflects the student's performance in the middle of the academic term.
+32. `G3.Port` is the final grade in Portuguese for the student, calculated on a scale from 0 to 20. It represents the overall achievement in Portuguese for the term or year.
+33. `G1.Math` is the first period grade in Mathematics, on a scale from 0 to 20.
+34. `G2.Math` is the second period grade in Mathematics, also on a numeric scale from 0 to 20.
+35. `G3.Math` is the final grade in Mathematics, on a scale from 0 to 20.
+
+# Data Preprocessing
+
+In order to ensure that the data is accurate, consistent, and suitable for effective modeling and analysis, the data cleaned and organized the dataset. This involves analyzing the dataset to pinpoint any absent values and deciding on appropriate strategies, such as deletion of rows/columns, based on the nature and extent of the missing data with the aim of minimizing bias and maintain the integrity of the dataset for accurate analysis and modeling. First, missing data needs to be identified and addressed to ensure data quality and reliability.
+
+```{r}
+#| label: missing-values
+missing_values <- colSums(is.na(exam_data))
+missing_values
+```
+
+However, there are no missing values. Next, the column containing the unique ID is excluded,because it does not provide distinct values for each row, which is essential for it to serve as a meaningful variable in the analysis.
+
+```{r}
+#| label: data-cleaning
+exam_data <- exam_data %>% dplyr::select(- `...1`)
+```
+
+This exclusion is done removing redundant or irrelevant information that does not contribute to the analysis or could potentially skew the results. By focusing on variables that offer valuable insights, like different grades, the dataset's relevance and the accuracy of our models is enhanced. This selective approach ensures that the analysis is based on variables that truly impact the outcomes we're investigating, leading to more precise and actionable findings. Some exploratory variables are also transformed into categorical values. This process is essential for handling variables like `school`, `sex`, `Mjob`, and `Fjob`, which, although initially categorical, need to be converted into a numerical format to help the statistical modeling. This will make them compatible with various analytical techniques that require numerical input.
+
+```{r}
+#| label: data-manipulation
+exam_data <- exam_data %>%
+  mutate(school = as.factor(school),
+         sex = as.factor(sex),
+         Mjob = as.factor(Mjob),
+         Fjob = as.factor(Fjob))
+```
+
+Another step in data preprocessing was to split the dataset into training and testing sets as this is crucial for validating the performance of the models built. A 70-30 otest split was used to ensure that the models are trained on a large portion of the data and tested on an unseen subset.
+
+```{r}
+#| label: training-data
+nrow_exam <- nrow(exam_data)
+ncol_exam <- ncol(exam_data)
+
+set.seed(1582)  
+train_indices <- sample(1:nrow_exam, round(0.7 * nrow_exam))  
+train_data <- exam_data[train_indices, ]
+test_data <- exam_data[-train_indices, ]
+view(train_data)
+view(test_data)
+
+train_data <- train_data[complete.cases(train_data), ]
+test_data <- test_data[complete.cases(test_data), ]
+
+
+```
+
+For task 2 the target variable G1.Port was binned into three categories. The binning strategy was chosen to ensure approximately equal numbers of cases in each category, transforming it into a categorical variable suitable for classification models.
+
+```{r}
+#| label: data-binning
+exam_data <- exam_data |>
+  mutate(catG1 = cut(`G1.Port`, breaks = 3, labels = c("Low", "Medium", "High")))
+
+```
+
+# Data Exploration
+
+For our data exploration we looked at all the bar plots and histogram for all the variables.
+
+```{r}
+par(mfrow = c(1, 1))
+for (i in 1:ncol_exam) {
+  if (is.numeric(train_data[, i])) {
+    hist(train_data[, i], main = names(train_data)[i], xlab = "")
+  } else {
+    barplot(table(train_data[, i]), main = names(train_data)[i])
+  }
+}
+```
+
+Now we present a box plot that shows the distribution of the grade in the first period G1 by a few explanatory variables.
+
+The boxplot for G1.Port by sex (male and female) shows that the median grade for females is higher than for males, suggesting that female students, on average, score higher in Portuguese during the first period. The female distribution is right skewed, this indicates that more female students score towards the higher end of the grade spectrum, reinforcing the idea that females generally perform better in this subject.
+
+```{r}
+ggplot(exam_data, aes(x = sex, y = G1.Port, fill = sex)) + 
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "G1.Port by Sex", x = "Sex", y = "G1.Port")
+```
+
+This boxplot likely compares the grades of students who receive school support versus those who do not. The median of schools with no support is higher than that of those who receive support suggesting that school support has no significant impact on a student getting a good grade in Portuguese.
+
+```{r}
+ggplot(exam_data, aes(x = schoolsup, y = G1.Port, fill = schoolsup)) + 
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "G1.Port by School Support", x = "School Support", y = "G1.Port")
+```
+
+The boxplot of G1.Port by school (GP and MS) shows that students in Gabriel Pereira perform better than students in Mousinho da Silveria.
+
+```{r}
+ggplot(exam_data, aes(x = school, y = G1.Port, fill = school)) + 
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "G1.Port by School", x = "School", y = "G1.Port")
+```
+
+This plot compares the performance of students from urban versus rural addresses. The spread of the grades indicates that living environment impacts academic achievement as student who live in Urban area seem to do much better than those who do not.
+
+```{r}
+ggplot(exam_data, aes(x = address, y = G1.Port, fill = address)) + 
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "G1.Port by Address", x = "Address", y = "G1.Port")
+```
+
+The boxplot comparing student grades based on their guardian type could indicates the guardian’s role affects student performance.Because the students who have their mothers as guardians have a higher median than that of those who have their fathers as guardians. Subsequently, both are higher than those whose parents are not guardians.
+
+```{r}
+ggplot(exam_data, aes(x = guardian, y = G1.Port, fill = schoolsup)) + 
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "G1.Port by Guardian", x = "Guardian", y = "G1.Port")
+```
+
+# Data Analysis
+
+### **Task 1: Predictive Modeling for G1.Port**
+
+We developed a predictive model targeting the variable 'G1.Port', which represents the first period grade in Portuguese. This model was built without incorporating any other grade features, ensuring that our predictions are based solely on non-academic factors. The default model included the variables 'freetime' (amount of free time after school), 'schoolsup' (extra educational support), 'paid.Math' (extra paid classes in Mathematics), and 'Dalc' (workday alcohol consumption), while explicitly excluding the variable 'reason' for school choice. Our models aim to establish how these specific factors contribute to predicting a student's performance in Portuguese, independent of their grades in other subjects. The effectiveness of our model is assessed using the R-squared value, which measures the proportion of variance in the dependent variable that is predictable from the independent variables.Therefore, an R-squared value closer to 1 indicates that the model explains a high proportion of the variance in the target variable, while a value closer to 0 suggests less explanatory power.
+
+To solve our first task we will fit a linear regression model with `G1.Port` as the response variable and `freetime`, `schoolsup`, `paid.math`, `Dalc`, and as the explanatory variables.
+
+```{r}
+
+exam_lm <- lm(`G1.Port` ~ freetime + schoolsup + `paid.Math` + Dalc , data = train_data)
+summary(exam_lm)
+
+
+predictions <- predict(exam_lm, newdata = test_data)
+view(predictions)
+
+accuracy <- sqrt(mean((test_data$G1.Port - predictions)^2))
+print(paste("Root Mean Squared Error (RMSE):", accuracy))
+```
+
+However, our adjusted R squared was not good enough so we added more variables for a second model, "exam_lm2".
+
+```{r}
+exam_lm2 <- lm(`G1.Port` ~ studytime + `paid.Math` + schoolsup + sex + guardian + address  + internet + activities + school + freetime + Dalc, data =train_data)
+summary(exam_lm2)
+
+
+predictions <- predict(exam_lm, newdata = test_data)
+view(predictions)
+
+accuracy <- sqrt(mean((test_data$G1.Port - predictions)^2))
+print(paste("Root Mean Squared Error (RMSE):", accuracy))
+```
+
+The average grade in G1 (first Portuguese period) grade is 12. The average here is our mean or intercept. Some notable mentions from the model are interpreted in the following. For every one unit increase in freetime, the predicted average first portuguese exam grade increases by 0.04. For every one unit increase in dalc, there is a decrease in the predicted average first portuguese exam grade by 0.501. If a student has school support, then the predicted average first portuguese exam grade decreases by -2.2. If the student's guardian is their mother, then predicted average first portuguese exam -0.7.
+
+In our analysis of the first period Portuguese grade (G1.Port) for secondary school students in Portugal, we identified some intriguing insights. The baseline or intercept of our model is set at an average grade of 12, which serves as a reference point for evaluating the impact of other variables. Notably, we find that leisure time (freetime) has a positive effect on academic performance; specifically, for each additional unit of free time, the predicted average grade in Portuguese slightly increases by 0.04. This could be due to the positive effects of balanced leisure activities on students' learning and well-being.
+
+Conversely, an increase in workday alcohol consumption (Dalc) appears to have a detrimental effect, with the model indicating that each unit increase in Dalc leads to an average decrease of 0.501 in the G1.Port grade. This negative correlation reflects the adverse impacts of alcohol consumption on aspects such as health and focus, which are crucial for academic success.
+
+Another interesting aspect is the influence of school support (schoolsup). Contrary to what one might expect, our model suggests that having school support correlates with a decrease in the predicted average grade by 2.2. This could imply that students who require additional school support may already be facing academic challenges. Additionally, the model reveals that students with their mothers as guardians tend to have a slightly lower predicted grade, decreasing by 0.7. This finding reflects the dynamics of guardian involvement and its effect on student performance.
+
+### **Task 2: Classification Model Using Binned G1.Port**
+
+In the second task, we transformed 'G1.Port' into a categorical variable by binning it into three categories, each containing roughly equal numbers of cases. This categorization is to simplify the variable into distinct performance levels (e.g., low, medium, high). Using this newly created categorical variable as the response, we developed a classification model. The model incorporated the same set of predictors as in Task 1: 'freetime', 'schoolsup', 'paid.Math', and 'Dalc', while continuing to exclude 'reason'.
+
+The bar plot below represents the distribution of Portuguese grades (categorized as low, medium, high) across genders. Stacked bars show the proportion of each grade category within male and female students, with percentages displayed in each segment. This visualization allows us to compare how grades are distributed between genders.
+
+```{r}
+ggplot(exam_data, aes(x=sex, fill = catG1)) +
+  geom_bar(position = "fill") +
+  stat_count(geom = "text", 
+             aes(label = paste(round((..count..)/sum(..count..)*100), "%")),
+             position=position_fill(vjust=0.5), colour="white")
+```
+
+```{r, warning=FALSE}
+
+cat_exam_glm <- multinom(`G1.Port` ~ freetime + schoolsup + `paid.Math` + Dalc, data = train_data)
+summary(cat_exam_glm)
+predictions_lm_final <- predict(cat_exam_glm, newdata = test_data)
+#view(predictions)
+accuracy_lm_final <- sqrt(mean((test_data$G1.Port - predictions_lm_final)^2))
+accuracy_lm_final
+ 
+predictions_cat_glm <- predict(cat_exam_glm, newdata = test_data, type = "class")
+accuracy_glm_final <- sqrt(mean((test_data$G1.Port - predictions_lm_final)^2))
+accuracy_glm_final
+```
+
+Doing the same for this model as in task 1, we added a few more variables to get a better model.
+
+```{r, warning=FALSE}
+cat_exam_glm <- multinom(`G1.Port` ~ studytime + schoolsup + sex + guardian + address  + internet + activities + school + freetime + Dalc +freetime + `paid.Math` , data = train_data)
+summary(cat_exam_glm)
+predictions_lm_final <- predict(cat_exam_glm, newdata = test_data)
+#view(predictions)
+accuracy_lm_final <- sqrt(mean((test_data$G1.Port - predictions_lm_final)^2))
+accuracy_lm_final
+ 
+predictions_cat_glm <- predict(cat_exam_glm, newdata = test_data, type = "class")
+accuracy_glm_final <- sqrt(mean((test_data$G1.Port - predictions_lm_final)^2))
+accuracy_glm_final
+```
+
+For this classification model, the interpretation of R-squared is slightly different, as it is typically used for regression analyses. However, if an analogous measure is used (like pseudo R-squared in logistic regression), it can still provide insights into the model's explanatory power. A higher value would suggest that our model is effective in categorizing students into the correct performance levels based on the given predictors.
+
+#### **Interpretation of R-Squared Value:**
+
+The R-squared value in both tasks is crucial for evaluating model performance. In the predictive model (Task 1), a higher R-squared value indicates that our selected variables are good predictors of a student's grade in Portuguese. Comparing the two models based on their statistical outputs reveals several noteworthy points. First, both models demonstrate high statistical significance, as indicated by their extremely low p-values (1.037e-15 for the first model and less than 2.2e-16 for the second). Such low p-values strongly suggest that the relationships captured in these models are not due to random chance. Interestingly, while the intercept of the first model is -13.7, the second model has a positive intercept at 12.166619, indicating a fundamental difference in how the baseline (where all predictors are zero) is calculated or interpreted in each model. Both models have an identical Root Mean Squared Error (RMSE) of approximately 2.4945, suggesting that they are similar in terms of predictive accuracy. The RMSE being identical in both models implies that, despite differences in their intercepts, their overall performance in predicting the first period Portuguese grades is comparable. The first model has an R-squared value of 0.1186, while the second model shows a higher R-squared value of 0.2629. These values indicates how much each model varies in the first period Portuguese grades (G1.Port) .
+
+The R-squared value of 0.1186 for the first model suggests that it makes up approximately 11.86% of the variance in the grades. While this indicates some level of predictive power, a significant portion of the grade variability remains unexplained by the model. This could be due to the absence of key predictive variables and or the presence of other unaccounted factors influencing student performance.
+
+In contrast, the second model, with an R-squared value of 0.2629, makes up of about 26.29% of the variance in the grades. This higher R-squared value indicates a better fit to the data compared to the first model, because includes variables that are more relevant or better capture the complexities influencing student grades in Portuguese.
+
+However, it is important to interpret these R-squared values cautiously. A higher R-squared value, while generally desirable, is not an absolute measure of a model's quality considering the possibility of overfitting, especially if the model is too complex. Therefore, while the second model appears to be more effective in explaining the variability in Portuguese grades, the choice between models should also consider other factors such as the complexity of the models, the potential for overfitting, and the relevance and interpretability of the included variables.
+
+In the classification model (Task 2), a high pseudo R-squared value suggests that these variables are effective in categorizing students into the correct performance level. It's important to note that while a higher R-squared value indicates a model that explains more variance, it does not necessarily imply causation, and other factors not included in the model might also influence student grades.
+
+Comparing the two models based on their Residual Deviance and Akaike Information Criterion (AIC) values provides insights into their fit and complexity. The first model has a higher Residual Deviance of 2481.018 and an AIC of 2611.018, while the second model shows a lower Residual Deviance of 2080.842 and an AIC of 2418.842. Residual deviance with lower values generally indicate a better fit. The second model's lower Residual Deviance suggests it makes more of the variance in the data compared to the first model. AIC assesses the quality of each model, balancing goodness of fit with the complexity of the model. A lower AIC value indicates a better model. The second model's lower AIC suggests it provides a more efficient balance between fit and complexity.
+
+These metrics, along with the previously discussed R-squared values (0.1186 for the first model and 0.2629 for the second), imply that the second model not only explains a greater proportion of variance in the response variable but also does so more efficiently.
+
+# Conclusion
+
+The analysis reveals that the second model, with its lower Residual Deviance and AIC, outperforms the first in both fitting the data and maintaining simplicity. This superior model, supported by a higher R-squared value, adeptly captures a larger fraction of the variance in student grades, suggesting a robust relationship between the included variables and academic success. It points to a strong influence of factors such as free time, school support, and parental involvement on student performance, offering valuable insights for educators and policymakers.
+
+However, our study is not without its limitations. The nature of statistical modeling inherently involves certain assumptions and potential biases. For instance, the models may not fully account for unmeasured variables that significantly impact student performance, such as personal motivation, teaching quality, or socio-economic background. Also only two schools were invovled hence the data is not very divers. Additionally, nature of our data limits our ability to draw causal inferences. This means that we must also remain cautious of overfitting, ensuring that our model's complexity does not overshadow its practical applicability.
+
+In conclusion, while our models provide a compelling narrative about the factors influencing academic success in Portuguese schools, they also highlight the need for a holistic approach in educational research. By acknowledging these limitations and continuing to refine our analytical methods, we can deepen our understanding and contribute more effectively to the ongoing efforts to enhance educational outcomes.
+
+### Refrences
+
+Cortez, P., & Silva, A. M. G. (n.d.). \[PDF\] Using data mining to predict secondary school student performance.Education and training monitor 2020. (n.d.). Retrieved January 31, 2024, from <https://op.europa.eu/webpub/eac/education-and-training-monitor-2020/countries/portugal.html>
+
+Mappadang, A., Khusaini, K., Sinaga, M., & Elizabeth, E. (2022). Academic interest determines the academic performance of undergraduate accounting students: Multinomial logit evidence. Cogent Business & Management, 9(1). <https://doi.org/10.1080/23311975.2022.2101326>
+
+Sean, D.-S. (n.d.). Student performance data set. Kaggle. Retrieved January 31, 2024, from <https://www.kaggle.com/datasets/larsen0966/student-performance-data-set/data>
+
+Secondary schools in Portugal: A guide for expat parents. (2021, October 12). Expatica Portugal. <https://www.expatica.com/pt/education/children-education/secondary-school-portugal-102912/>
+
+Student performance report. (n.d.). Learning and Teaching: Teach HQ. Retrieved January 31, 2024, from <https://www.monash.edu/learning-teaching/teachhq/Teaching-practices/learning-analytics/boe-report/student-performance-report>
